@@ -87,7 +87,7 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
         address caller = msg.sender;
 
         burningToken.burnFrom(caller, amount);
-        votingToken.mint(caller, amount * votesMultiplier);
+        votingToken.mint(caller, amount / 1e18 * votesMultiplier);
 
         shareInfos[caller].share += amount;
         totalShare += amount;
