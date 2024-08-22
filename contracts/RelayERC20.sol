@@ -3,17 +3,16 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import './interface/IERC20Mintable.sol';
+import './common/ICommonError.sol';
 
 /**
  * @title RelayERC20
  * @notice {RelayERC20} is minted at a fixed rate when UNX is burned within the Unchain X ecosystem.
  */
-contract RelayERC20 is IERC20Mintable, ERC20Burnable {
+contract RelayERC20 is IERC20Mintable, ERC20Burnable, ICommonError {
     /// @dev The minter should be a contract implementing the UNX burning process.
     address public immutable minter;
     
-    error Unauthorized(address caller);
-
     constructor(string memory name_, string memory symbol_, address minter_) ERC20(name_, symbol_) {
         require(minter_ != address(0));
         minter = minter_;

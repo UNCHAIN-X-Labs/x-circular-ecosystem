@@ -9,21 +9,38 @@ import './interface/IVotingERC721.sol';
 import './VotingERC721.sol';
 import './common/CommonAuth.sol';
 
+/**
+ * @title XRecycling
+ * @notice {XRecycling} is a protocol contract designed to burn tokens to gain share and receive token rewards based on that share.
+ * The share accumulates over time, however when rewards are claimed, the existing share is reduced proportionally to the ratio of the claimed reward to the total remaining rewards.
+ * Additionally, each time add to share, earn a voting NFT.
+ */
 contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
+    /// @notice
     IHalvingProtocol public immutable halvingProtocol;
+    /// @notice
     IERC20Burnable public immutable burningToken;
+    /// @notice
     IVotingERC721 public immutable votingToken;
+    /// @notice
     uint256 public immutable votesMultiplier;
 
+    /// @notice Active status
     bool public actived;
-    // apply 2 decimals. 100.00 % => 10000
+    /// @notice Allocated reward ratio. Apply 2 decimals. 100.00 % => 10000
     uint256 public allocation;
+    /// @notice Last updated block number
     uint256 public lastUpdatedBlock;
+    /// @notice Stored reward per share​
     uint256 public rewardPerShareStored;
+    /// @notice Total Share
     uint256 public totalShare;
+    /// @notice Total claimed reward amount
     uint256 public claimedReward;
+    /// @notice The block number where the share was first added.
     uint256 public initInputBlock;
 
+    /// @notice The share information per account
     mapping(address => ShareInfo) public shareInfos;
 
     modifier updateReward() {
@@ -57,6 +74,11 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
         votesMultiplier = votesMultiplier_;
     }
 
+    /**
+     * @notice Set the reward allocation active status to active.​
+     * It should be executed only once for the first time by owner or executor.
+     * @param allocation_ UNX reward allocation
+     */
     function initialize(uint256 allocation_) external onlyOwnerOrExecutor {
         if(actived) {
             revert AlreadyInitialized();
@@ -66,6 +88,13 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
         emit Activate();
     }
 
+    /**
+     * @notice Burn tokens to add share.
+     * Additionally, earn voting NFT based on the amount of tokens burned.
+     * @param amount The amount of tokens to burn​
+     * @return expectedTotalShare Expected total share
+     * @return expectedShare Expected share
+     */
     function addShare(uint256 amount) 
         external
         nonReentrant
@@ -98,6 +127,15 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
         emit AddShare(caller, amount);
     }
 
+    /**
+     * @notice Claim reward.
+     * The share will also be reduced by the same ratio as the claimed reward compared to the total reward.​
+     * It will revert if the remaining share is less than the required minimum remaining share.​
+     * @param minRequiredRemains Required minimum remaining share
+     * @param requiredReward Required reward claim amount
+     * @return remainShare The Remaining share
+     * @return remainTotalShare The total remaing share
+     */
     function claim(uint256 minRequiredRemains, uint256 requiredReward)
         external
         nonReentrant
@@ -139,16 +177,38 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
         emit RemoveShare(caller, subShare);
     }
 
+    /**
+     * @notice Return dashboard Information.
+     * @param account The address of user.
+     */
+    function dashboardInfo(address account) public view returns (DashboardInfo memory result) {
+        result.earned = earned(account);
+        result.totalShare = totalShare;
+        result.share = shareInfos[account].share;
+        result.totalClaimedReward = claimedReward;
+        result.allocatedRewardPerDay = rewardPerBlock() * 28800;
+    }
+
+    /**
+     * @notice Returns the currently earned reward amount.
+     * @param account The address of account
+     */
     function earned(address account) public view returns (uint256) {
         ShareInfo memory shareInfo = shareInfos[account];
         return (shareInfo.share * (rewardPerShare() - shareInfo.userRewardPerSharePaid)) / 1e18 + shareInfo.reward;
     }
 
+    /**
+     * @notice Returns the last reward block.​
+     */
     function lastBlockRewardApplicable() public view returns (uint256) {
         uint256 endBlock = halvingProtocol.endBlock();
         return endBlock <= block.number ? endBlock : block.number;
     }    
 
+    /**
+     * @notice Returns the reward amount per share.
+     */
     function rewardPerShare() public view returns (uint256 reward) {
         reward = rewardPerShareStored;
 
@@ -174,10 +234,17 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
         }
     }
 
+    /**
+     * @notice Returns the current reward amount per block.
+     */
     function rewardPerBlock() public view returns (uint256 reward) {
         reward = halvingProtocol.currentRewardPerBlock() * allocation / 10000;
     }
 
+    /**
+     * @notice Returns the reward amount per block for a specific halving number.
+     * @param halvingNum The halving number.
+     */
     function rewardPerBlockOf(uint256 halvingNum) public view returns (uint256 reward) {
         if(halvingNum > halvingProtocol.halvingBlocks().length) {
             revert InvalidNumber(halvingNum);
@@ -185,6 +252,9 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
         reward = halvingProtocol.rewardPerBlockOf(halvingNum) * allocation / 10000;
     }
 
+    /**
+     * @notice Returns the current total remaining reward amount.
+     */
     function totalRemainReward() public view returns (uint256 remains) {
         uint256[] memory halvingBlocks = halvingProtocol.halvingBlocks();
         uint256 lastBlock = block.number;

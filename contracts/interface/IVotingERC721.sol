@@ -14,5 +14,10 @@ interface IVotingERC721 is ICommonError {
     error AlreadyHasNoRole(address addr);
     error PreMintingIsAlreadyDone();
 
+    /**
+     * @notice Mint voting NFT
+     * @param to The address of receiver.
+     * @param votes The number of votes.
+     */
     function mint(address to, uint256 votes) external;
 }

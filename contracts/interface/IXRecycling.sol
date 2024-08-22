@@ -10,6 +10,14 @@ interface IXRecycling is ICommonError {
         uint256 reward;
     }
 
+    struct DashboardInfo {
+        uint256 earned;
+        uint256 totalShare;
+        uint256 share;
+        uint256 totalClaimedReward;
+        uint256 allocatedRewardPerDay;
+    }
+
     event Activate();
     event AddShare(address indexed account, uint256 share);
     event Allocate(uint256 oldValue, uint256 newValue);
