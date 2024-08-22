@@ -34,7 +34,7 @@ contract XExplosion is ICommonError, ReentrancyGuard {
         string memory name_,
         string memory symbol_
     ) {
-        if (multiplier_ > 0) {
+        if (multiplier_ == 0) {
             revert InvalidNumber(multiplier_);
         }
 
