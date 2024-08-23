@@ -7,6 +7,15 @@ import "./common/CommonAuth.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
+/**
+ * @title TimeLockController
+ * @notice The {TimelockController} is based on OpenZeppelin’s TimelockController (https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/governance/TimelockController.sol).
+ * The key differences from the original code are as follows:
+ * While the original version assigns specific roles for executing different functions, in this version, actions can only be executed by two accounts: the owner and the executor.
+ * The reason for this is to facilitate a gradual transfer of authority from the owner to the DAO.
+ * At the point when all authority is handed over to the DAO, the owner address will be set to the zero address, thereby relinquishing control.
+ * The executor will be set to a contract within the DAO responsible for proposing and executing decisions, rather than being an externally owned account (EOA).
+ */
 contract TimeLockController is IBaseTimeLock, CommonAuth, ReentrancyGuard {
     uint256 internal constant _DONE_TIMESTAMP = uint256(1);
     uint256 internal constant _CANCEL_TIMESTAMP = uint256(2);
@@ -22,6 +31,11 @@ contract TimeLockController is IBaseTimeLock, CommonAuth, ReentrancyGuard {
         maxDelay = maxDelay_;
     }
 
+    /**
+     * Add transaction data to the execution queue.
+     * @param params Information on the transaction data to be executed.
+     * @param delay Delay before execution.
+     */
     function enqueue(DataParams[] calldata params, uint256 delay) external nonReentrant onlyOwnerOrExecutor {
         if(delay < minDelay || delay > maxDelay) {
             revert InvalidNumber(delay);
@@ -43,6 +57,10 @@ contract TimeLockController is IBaseTimeLock, CommonAuth, ReentrancyGuard {
         emit Enqueue(id, params, scheduledTimestamp, _salt);
     }
 
+    /**
+     * Execute the transaction data in the queue.
+     * @param ids Array of queue IDs to execute.
+     */
     function execute(bytes32[] calldata ids) external nonReentrant onlyOwnerOrExecutor {
         for (uint256 i = 0; i < ids.length; ++i) {
             OperationState state = operationState(ids[i]);
@@ -70,6 +88,10 @@ contract TimeLockController is IBaseTimeLock, CommonAuth, ReentrancyGuard {
         }
     }
 
+    /**
+     * Cancel the transaction data from the queue.
+     * @param ids Array of queue IDs to cancel.
+     */
     function cancel(bytes32[] calldata ids) external nonReentrant onlyOwnerOrExecutor {
         for (uint256 i = 0; i < ids.length; ++i) {
             OperationState state = operationState(ids[i]);
@@ -92,6 +114,12 @@ contract TimeLockController is IBaseTimeLock, CommonAuth, ReentrancyGuard {
         }
     }
 
+    /**
+     * Return operation state
+     * The order of states is as follows:
+     * Unset - Waiting - Ready / Cancel - Done / Cancel
+     * @param id Queue ID
+     */
     function operationState(bytes32 id) public view returns (OperationState state) {
         uint256 scheduledTimestamp = _scheduledTimestamp[id];
 
