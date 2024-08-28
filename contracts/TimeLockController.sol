@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.24;
 
-import "./interface/IBaseTimeLock.sol";
-import "./common/CommonAuth.sol";
+import {IBaseTimeLock} from "./interface/IBaseTimeLock.sol";
+import {CommonAuth} from "./common/CommonAuth.sol";
 
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
 /**

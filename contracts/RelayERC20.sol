@@ -2,8 +2,8 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
-import './interface/IERC20Mintable.sol';
-import './common/ICommonError.sol';
+import {IERC20Mintable} from './interface/IERC20Mintable.sol';
+import {ICommonError} from './common/ICommonError.sol';
 
 /**
  * @title RelayERC20

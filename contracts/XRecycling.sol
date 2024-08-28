@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import './interface/IXRecycling.sol';
-import './interface/IHalvingProtocol.sol';
-import './interface/IERC20Burnable.sol';
-import './interface/IVotingERC721.sol';
-import './VotingERC721.sol';
-import './common/CommonAuth.sol';
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+import {IXRecycling} from './interface/IXRecycling.sol';
+import {IHalvingProtocol} from './interface/IHalvingProtocol.sol';
+import {IERC20Burnable} from './interface/IERC20Burnable.sol';
+import {IVotingERC721} from './interface/IVotingERC721.sol';
+import {VotingERC721} from './VotingERC721.sol';
+import {CommonAuth} from './common/CommonAuth.sol';
 
 /**
  * @title XRecycling
