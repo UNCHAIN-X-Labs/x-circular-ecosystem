@@ -14,7 +14,9 @@ contract RelayERC20 is IERC20Mintable, ERC20Burnable, ICommonError {
     address public immutable minter;
     
     constructor(string memory name_, string memory symbol_, address minter_) ERC20(name_, symbol_) {
-        require(minter_ != address(0));
+        if (minter_ == address(0)) {
+            revert InvalidAddress(minter_);
+        }
         minter = minter_;
     }
 
