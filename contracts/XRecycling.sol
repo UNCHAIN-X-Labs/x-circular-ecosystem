@@ -86,6 +86,7 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
         }
         _setAllocation(allocation_);
         actived = true;
+        lastUpdatedBlock = block.number;
         emit Activate();
     }
 
@@ -102,7 +103,7 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
         updateReward
         returns (uint256 expectedTotalShare, uint256 expectedShare)
     {
-        if(!actived) {
+        if(!actived || block.number < halvingProtocol.genesisBlock()) {
             revert InactiveProtocol();
         }
 
@@ -216,7 +217,7 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
         if (totalShare > 0) {
             uint256[] memory halvingBlocks = halvingProtocol.halvingBlocks();
             uint256 targetBlock = lastBlockRewardApplicable();
-            uint256 tmpUpdatedBlock = lastUpdatedBlock;
+            uint256 tmpUpdatedBlock = lastUpdatedBlock < halvingProtocol.genesisBlock() ? halvingProtocol.genesisBlock() : lastUpdatedBlock;
 
             for(uint256 i = 0; i < halvingBlocks.length; ++i) {
                 if(halvingBlocks[i] > tmpUpdatedBlock && halvingBlocks[i] <= targetBlock) {
@@ -290,7 +291,7 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
         if (allocation_ > 10000) {
             revert InvalidNumber(allocation_);
         }
-        
+
         uint256 oldAlloc = allocation;
         allocation = allocation_;
         emit Allocate(oldAlloc, allocation_);
