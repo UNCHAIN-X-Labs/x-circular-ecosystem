@@ -27,6 +27,15 @@ contract TimeLockController is IBaseTimeLock, CommonAuth, ReentrancyGuard {
     mapping(bytes32 => uint256) private _scheduledTimestamp;
 
     constructor(address owner_, uint256 minDelay_, uint256 maxDelay_) CommonAuth(owner_) {
+        // The minimum delay waiting time is 48 hours.
+        if (minDelay_ < 172800) {
+            revert InvalidNumber(minDelay_);
+        }
+        
+        if (minDelay_ > maxDelay_) {
+            revert InvalidNumber(maxDelay_);
+        }
+
         minDelay = minDelay_;
         maxDelay = maxDelay_;
     }

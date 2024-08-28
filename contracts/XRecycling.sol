@@ -287,6 +287,10 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
     }
 
     function _setAllocation(uint256 allocation_) internal {
+        if (allocation_ > 10000) {
+            revert InvalidNumber(allocation_);
+        }
+        
         uint256 oldAlloc = allocation;
         allocation = allocation_;
         emit Allocate(oldAlloc, allocation_);
