@@ -23,7 +23,7 @@ contract TimeLockController is IBaseTimeLock, CommonAuth, ReentrancyGuard {
     uint256 public immutable minDelay;
     uint256 public immutable maxDelay;
 
-    mapping(bytes32 => DataParams[]) private _data;
+    mapping(bytes32 => bytes32) private _data;
     mapping(bytes32 => uint256) private _scheduledTimestamp;
 
     constructor(address owner_, uint256 minDelay_, uint256 maxDelay_) CommonAuth(owner_) {
@@ -48,8 +48,9 @@ contract TimeLockController is IBaseTimeLock, CommonAuth, ReentrancyGuard {
         }
 
         uint256 scheduledTimestamp = block.timestamp + delay;
+        bytes32 paramsHash = keccak256(abi.encode(params));
 
-        _data[id] = params;
+        _data[id] = paramsHash;
         _scheduledTimestamp[id] = scheduledTimestamp;
 
         emit Enqueue(id, params, scheduledTimestamp, _salt);
@@ -57,32 +58,32 @@ contract TimeLockController is IBaseTimeLock, CommonAuth, ReentrancyGuard {
 
     /**
      * Execute the transaction data in the queue.
-     * @param ids Array of queue IDs to execute.
+     * @param params Array of {ExecuteParams}.
      */
-    function execute(bytes32[] calldata ids) external nonReentrant onlyOwnerOrExecutor {
-        for (uint256 i = 0; i < ids.length; ++i) {
-            OperationState state = operationState(ids[i]);
+    function execute(ExecuteParams[] calldata params) external nonReentrant onlyOwnerOrExecutor {
+        for (uint256 i = 0; i < params.length; ++i) {
+            OperationState state = operationState(params[i].id);
 
             if (state == OperationState.Unset) {
-                revert DoesNotExistData(ids[i]);
+                revert DoesNotExistData(params[i].id);
             }
 
             if (state == OperationState.Done) {
-                revert AlreadyExecutedData(ids[i]);
+                revert AlreadyExecutedData(params[i].id);
             }
 
             if (state == OperationState.Cancel) {
-                revert AlreadyCanceledData(ids[i]);
+                revert AlreadyCanceledData(params[i].id);
             }
 
             if (state == OperationState.Waiting) {
-                revert NotYetReady(ids[i]);
+                revert NotYetReady(params[i].id);
             }
 
-            _execute(ids[i]);
-            _scheduledTimestamp[ids[i]] = _DONE_TIMESTAMP;
+            _execute(params[i]);
+            _scheduledTimestamp[params[i].id] = _DONE_TIMESTAMP;
 
-            emit Execute(ids[i]);
+            emit Execute(params[i].id);
         }
     }
 
@@ -144,10 +145,13 @@ contract TimeLockController is IBaseTimeLock, CommonAuth, ReentrancyGuard {
         return keccak256(abi.encode(params, salt));
     }
 
-    function _execute(bytes32 id) internal {
-        DataParams[] memory data = _data[id];
-        for (uint256 i = 0; i < data.length; ++i) {
-            (bool success, bytes memory returndata) = data[i].target.call(data[i].payload);
+    function _execute(ExecuteParams calldata params) internal {
+        if (_data[params.id] != keccak256(abi.encode(params.dataParams))) {
+            revert InvalidHashData(params.dataParams, params.id);
+        }
+
+        for (uint256 i = 0; i < params.dataParams.length; ++i) {
+            (bool success, bytes memory returndata) = params.dataParams[i].target.call(params.dataParams[i].payload);
             Address.verifyCallResult(success, returndata);
         }
     }
