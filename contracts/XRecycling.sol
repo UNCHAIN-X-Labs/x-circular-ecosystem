@@ -17,14 +17,16 @@ import {CommonAuth} from './common/CommonAuth.sol';
  * Additionally, each time add to share, earn a voting NFT.
  */
 contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
-    /// @notice
+    /// @notice UNX Halving Contract
     IHalvingProtocol public immutable halvingProtocol;
-    /// @notice
+    /// @notice XPT ERC20 Contract
     IERC20Burnable public immutable burningToken;
-    /// @notice
+    /// @notice Voting token Contract
     IVotingERC721 public immutable votingToken;
-    /// @notice
+    /// @notice Multiplier for calculating vote allocation
     uint256 public immutable votesMultiplier;
+    /// @notice Precision for calculating share deduction ratio
+    uint256 public constant PRECISION = 1e8;
 
     /// @notice Active status
     bool public actived;
@@ -158,8 +160,8 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
         }
 
         // Calculate reduction ratio
-        uint256 quotient = totalRemainReward() / requiredReward;
-        uint256 subShare = currentShare / quotient;
+        uint256 quotient = totalRemainReward() * PRECISION / requiredReward;
+        uint256 subShare = currentShare * PRECISION / quotient;
         remainTotalShare = totalShare - subShare;
         remainShare = currentShare - subShare;
         
