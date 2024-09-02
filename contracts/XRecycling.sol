@@ -332,6 +332,10 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
      * @notice Returns the current total remaining reward amount.
      */
     function totalRemainReward() public view returns (uint256 remains) {
+        if (initInputBlock < halvingProtocol.genesisBlock()) {
+            revert InactiveProtocol();
+        }
+        
         uint256[] memory halvingBlocks = halvingProtocol.halvingBlocks();
         uint256 lastBlock = block.number;
         uint256 tmpBlock = initInputBlock;
