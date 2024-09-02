@@ -343,8 +343,8 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
         for(uint256 i = 0; i < halvingBlocks.length; ++i) {
             if(lastBlock >= halvingBlocks[i]) {
                 // Calculate reward before halving
-                remains += rewardPerBlockOf(i) * ((halvingBlocks[i] - 1) - tmpBlock + 1);
-                tmpBlock = halvingBlocks[i] - 1;
+                remains += rewardPerBlockOf(i) * (halvingBlocks[i] - tmpBlock);
+                tmpBlock = halvingBlocks[i];
             }
         }
 
