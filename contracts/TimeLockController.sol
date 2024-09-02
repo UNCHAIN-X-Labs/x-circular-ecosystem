@@ -50,6 +50,12 @@ contract TimeLockController is IBaseTimeLock, CommonAuth, ReentrancyGuard {
             revert InvalidNumber(delay);
         }
 
+        for (uint256 i = 0; i < params.length; ++i) {
+            if (_validateCodeSize(params[i].target) == 0) {
+                revert InvalidAddress(params[i].target);
+            }
+        }
+
         bytes32 id = getId(params, ++_salt);
 
         if(operationState(id) != OperationState.Unset) {
@@ -162,6 +168,12 @@ contract TimeLockController is IBaseTimeLock, CommonAuth, ReentrancyGuard {
         for (uint256 i = 0; i < params.dataParams.length; ++i) {
             (bool success, bytes memory returndata) = params.dataParams[i].target.call(params.dataParams[i].payload);
             Address.verifyCallResult(success, returndata);
+        }
+    }
+
+    function _validateCodeSize(address addr) internal view returns (uint32 size) {
+        assembly {
+            size := extcodesize(addr)
         }
     }
 }

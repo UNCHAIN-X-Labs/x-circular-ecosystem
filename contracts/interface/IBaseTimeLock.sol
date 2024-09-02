@@ -38,6 +38,7 @@ interface IBaseTimeLock {
     error InvalidNumber(uint256 input);
     error InvalidData(DataParams data);
     error InvalidHashData(DataParams[] data, bytes32 id);
+    error InvalidAddress(address addr);
 
     function enqueue(DataParams[] calldata params, uint256 delay) external;
     function execute(ExecuteParams[] calldata params) external;
