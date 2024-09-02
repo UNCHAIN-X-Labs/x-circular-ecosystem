@@ -122,13 +122,15 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
      * @param params Array of {AllocateVotingPowerParams}
      */
     function preAllocateVotingPower(AllocateVotingPowerParams[] calldata params) external onlyOwner {
-        if (preVotingPowerAllocation) {
+        if (preVotingPowerAllocation || actived) {
             revert AlreadyInitialized();
         }
         
         for (uint256 i = 0; i < params.length; ++i) {
             _updateVotes(params[i].account, 0, params[i].votingPower);
         }
+
+        preVotingPowerAllocation = true;
     }
 
     /**
