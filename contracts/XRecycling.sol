@@ -290,7 +290,7 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
         if (totalShare > 0) {
             uint256[] memory halvingBlocks = halvingProtocol.halvingBlocks();
             uint256 targetBlock = lastBlockRewardApplicable();
-            uint256 tmpUpdatedBlock = lastUpdatedBlock < halvingProtocol.genesisBlock() ? halvingProtocol.genesisBlock() : lastUpdatedBlock;
+            uint256 tmpUpdatedBlock = lastUpdatedBlock < halvingProtocol.genesisBlock() ? halvingProtocol.genesisBlock() - 1 : lastUpdatedBlock;
 
             for(uint256 i = 0; i < halvingBlocks.length; ++i) {
                 if(halvingBlocks[i] > tmpUpdatedBlock && halvingBlocks[i] <= targetBlock) {
@@ -350,7 +350,7 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
 
         if(tmpBlock <= lastBlock) {
             uint256 _rewardPerBlock = block.number > halvingProtocol.endBlock() ? rewardPerBlockOf(halvingBlocks.length) : rewardPerBlock();
-            remains = _rewardPerBlock * (lastBlock - tmpBlock + 1);
+            remains += _rewardPerBlock * (lastBlock - tmpBlock + 1);
         }
 
         remains -= claimedReward;
