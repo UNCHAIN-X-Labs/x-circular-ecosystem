@@ -3,7 +3,8 @@
   "license": "GPL-2.0-only",
   "scripts": {
     "compile": "npx hardhat compile",
-    "clean": "npx hardhat clean"
+    "clean": "npx hardhat clean",
+    "docgen": "npx hardhat docgen"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
