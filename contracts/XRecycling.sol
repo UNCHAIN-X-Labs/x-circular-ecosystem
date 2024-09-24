@@ -1,30 +1,35 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import './interface/IXRecycling.sol';
-import './interface/IHalvingProtocol.sol';
-import './interface/IERC20Burnable.sol';
-import './interface/IVotingERC721.sol';
-import './VotingERC721.sol';
-import './common/CommonAuth.sol';
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+import {IXRecycling} from './interface/IXRecycling.sol';
+import {IHalvingProtocol} from './interface/IHalvingProtocol.sol';
+import {IERC20Burnable} from './interface/IERC20Burnable.sol';
+import {IVotingToken} from './interface/IVotingToken.sol';
+import {CommonAuth} from './common/CommonAuth.sol';
 
 /**
  * @title XRecycling
  * @notice {XRecycling} is a protocol contract designed to burn tokens to gain share and receive token rewards based on that share.
  * The share accumulates over time, however when rewards are claimed, the existing share is reduced proportionally to the ratio of the claimed reward to the total remaining rewards.
- * Additionally, each time add to share, earn a voting NFT.
+ * Additionally, each time add to share, receive voting power that can be used in future governance votes.
+ * This voting power will later be exchanged for voting tokens.
  */
 contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
-    /// @notice
+    /// @notice UNX Halving Contract
     IHalvingProtocol public immutable halvingProtocol;
-    /// @notice
+    /// @notice XPT ERC20 Contract
     IERC20Burnable public immutable burningToken;
-    /// @notice
-    IVotingERC721 public immutable votingToken;
-    /// @notice
+    /// @notice Multiplier for calculating vote allocation
     uint256 public immutable votesMultiplier;
+    /// @notice Precision for calculating share deduction ratio
+    uint256 public constant PRECISION = 1e8;
 
+    /// @notice Voting token Contract
+    IVotingToken public votingToken;
+    /// @notice Pre-Voting Power Allocation status
+    bool private preVotingPowerAllocation;
     /// @notice Active status
     bool public actived;
     /// @notice Allocated reward ratio. Apply 2 decimals. 100.00 % => 10000
@@ -39,9 +44,14 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
     uint256 public claimedReward;
     /// @notice The block number where the share was first added.
     uint256 public initInputBlock;
+    /// @notice The minimum amount required to mint voting tokens
+    uint256 public minRequireForMint;
 
     /// @notice The share information per account
     mapping(address => ShareInfo) public shareInfos;
+
+    /// @notice Returns the number of voting rights allocated to each account.
+    mapping(address => uint256) public votesOf;
 
     modifier updateReward() {
         _updateReward(msg.sender);
@@ -51,9 +61,6 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
     constructor(
         address halvingProtocol_,
         address burningToken_,
-        string memory name_,
-        string memory symbol_,
-        string memory uri_,
         uint256 votesMultiplier_
     ) CommonAuth(msg.sender) {
         if(_validateCodeSize(halvingProtocol_) == 0) {
@@ -70,7 +77,6 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
 
         halvingProtocol = IHalvingProtocol(halvingProtocol_);
         burningToken = IERC20Burnable(burningToken_);
-        votingToken = new VotingERC721{salt: keccak256(abi.encode(msg.sender, address(this)))}(name_, symbol_, uri_, address(this));
         votesMultiplier = votesMultiplier_;
     }
 
@@ -85,12 +91,51 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
         }
         _setAllocation(allocation_);
         actived = true;
+        lastUpdatedBlock = block.number;
         emit Activate();
     }
 
     /**
+     * @notice Initialize voting token minting coniguration.
+     * Only once execute by owner.
+     * @param votingToken_ The voting token contract
+     */
+    function initializeMintingConfig(address votingToken_, uint256 minRequireForMint_) external onlyOwnerOrExecutor {
+        if (address(votingToken) != address(0)) {
+            revert AlreadyInitialized();
+        }
+
+        if (_validateCodeSize(votingToken_) == 0) {
+            revert InvalidAddress(votingToken_);
+        }
+
+        if (minRequireForMint_ == 0) {
+            revert InvalidNumber(minRequireForMint_);
+        }
+
+        votingToken = IVotingToken(votingToken_);
+        minRequireForMint = minRequireForMint_;
+    }
+
+    /**
+     * @notice Allocate pre-voting power as a referral reward for the launchpad.
+     * @param params Array of {AllocateVotingPowerParams}
+     */
+    function preAllocateVotingPower(AllocateVotingPowerParams[] calldata params) external onlyOwner {
+        if (preVotingPowerAllocation || actived) {
+            revert AlreadyInitialized();
+        }
+        
+        for (uint256 i = 0; i < params.length; ++i) {
+            _updateVotes(params[i].account, 0, params[i].votingPower);
+        }
+
+        preVotingPowerAllocation = true;
+    }
+
+    /**
      * @notice Burn tokens to add share.
-     * Additionally, earn voting NFT based on the amount of tokens burned.
+     * Additionally, earn voting token based on the amount of tokens burned.
      * @param amount The amount of tokens to burn​
      * @return expectedTotalShare Expected total share
      * @return expectedShare Expected share
@@ -101,7 +146,7 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
         updateReward
         returns (uint256 expectedTotalShare, uint256 expectedShare)
     {
-        if(!actived) {
+        if(!actived || block.number < halvingProtocol.genesisBlock()) {
             revert InactiveProtocol();
         }
 
@@ -116,7 +161,6 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
         address caller = msg.sender;
 
         burningToken.burnFrom(caller, amount);
-        votingToken.mint(caller, amount / 1e18 * votesMultiplier);
 
         shareInfos[caller].share += amount;
         totalShare += amount;
@@ -125,6 +169,13 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
         expectedShare = shareInfos[caller].share;
 
         emit AddShare(caller, amount);
+
+        if (amount >= 1e18) {
+            uint256 votes = amount / 1e18 * votesMultiplier;
+            uint256 oldVotes = votesOf[caller];
+            uint256 newVotes = oldVotes + votes;
+            _updateVotes(caller, oldVotes, newVotes);
+        }
     }
 
     /**
@@ -156,8 +207,8 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
         }
 
         // Calculate reduction ratio
-        uint256 quotient = totalRemainReward() / requiredReward;
-        uint256 subShare = currentShare / quotient;
+        uint256 quotient = totalRemainReward() * PRECISION / requiredReward;
+        uint256 subShare = currentShare * PRECISION / quotient;
         remainTotalShare = totalShare - subShare;
         remainShare = currentShare - subShare;
         
@@ -175,6 +226,30 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
         shareInfos[caller].share = remainShare;
         totalShare = remainTotalShare;
         emit RemoveShare(caller, subShare);
+    }
+
+    /**
+     * @notice Mint voting token based on the voting power allocated to the account.
+     * @param requiredAmount The required amount for mint.
+     */
+    function mintVotingToken(uint256 requiredAmount) external nonReentrant {
+        if (address(votingToken) == address(0)) {
+            revert InvalidAddress(address(votingToken));
+        }
+
+        if (requiredAmount < minRequireForMint) {
+            revert InvalidNumber(requiredAmount);
+        }
+
+        address caller = msg.sender;
+        uint256 votes = votesOf[caller];
+
+        if (votes < requiredAmount) {
+            revert InsufficientVotes(caller);
+        }
+
+        votingToken.mint(caller, requiredAmount);
+        _updateVotes(caller, votes, votes - requiredAmount);
     }
 
     /**
@@ -215,7 +290,7 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
         if (totalShare > 0) {
             uint256[] memory halvingBlocks = halvingProtocol.halvingBlocks();
             uint256 targetBlock = lastBlockRewardApplicable();
-            uint256 tmpUpdatedBlock = lastUpdatedBlock;
+            uint256 tmpUpdatedBlock = lastUpdatedBlock < halvingProtocol.genesisBlock() ? halvingProtocol.genesisBlock() - 1 : lastUpdatedBlock;
 
             for(uint256 i = 0; i < halvingBlocks.length; ++i) {
                 if(halvingBlocks[i] > tmpUpdatedBlock && halvingBlocks[i] <= targetBlock) {
@@ -229,7 +304,8 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
             // Calculate reward after halving
             // after-halving duration (targetBlock - tmpUpdatedBlock)
             if(tmpUpdatedBlock < targetBlock) {
-                reward += rewardPerBlock() * (targetBlock - tmpUpdatedBlock) * 1e18 / totalShare;
+                uint256 _rewardPerBlock = block.number > halvingProtocol.endBlock() ? rewardPerBlockOf(halvingBlocks.length) : rewardPerBlock();
+                reward += _rewardPerBlock * (targetBlock - tmpUpdatedBlock) * 1e18 / totalShare;
             }
         }
     }
@@ -256,23 +332,33 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
      * @notice Returns the current total remaining reward amount.
      */
     function totalRemainReward() public view returns (uint256 remains) {
+        if (initInputBlock < halvingProtocol.genesisBlock()) {
+            revert InactiveProtocol();
+        }
+        
         uint256[] memory halvingBlocks = halvingProtocol.halvingBlocks();
         uint256 lastBlock = block.number;
         uint256 tmpBlock = initInputBlock;
 
         for(uint256 i = 0; i < halvingBlocks.length; ++i) {
-            if(lastBlock > halvingBlocks[i]) {
+            if(lastBlock >= halvingBlocks[i]) {
                 // Calculate reward before halving
-                remains += rewardPerBlockOf(i) * ((halvingBlocks[i] - 1) - tmpBlock + 1) * 1e18 / totalShare;
+                remains += rewardPerBlockOf(i) * (halvingBlocks[i] - tmpBlock);
                 tmpBlock = halvingBlocks[i];
             }
         }
 
         if(tmpBlock <= lastBlock) {
-            remains = rewardPerBlock() * (lastBlock - tmpBlock + 1);
+            uint256 _rewardPerBlock = block.number > halvingProtocol.endBlock() ? rewardPerBlockOf(halvingBlocks.length) : rewardPerBlock();
+            remains += _rewardPerBlock * (lastBlock - tmpBlock + 1);
         }
 
-        remains - claimedReward;
+        remains -= claimedReward;
+    }
+
+    function _updateVotes(address caller, uint256 oldVotes, uint256 newVotes) internal {
+        votesOf[caller] = newVotes;
+        emit UpdateVotes(caller, oldVotes, newVotes);
     }
 
     function _updateReward(address account) internal {
@@ -286,6 +372,10 @@ contract XRecycling is IXRecycling, CommonAuth, ReentrancyGuard {
     }
 
     function _setAllocation(uint256 allocation_) internal {
+        if (allocation_ > 10000) {
+            revert InvalidNumber(allocation_);
+        }
+
         uint256 oldAlloc = allocation;
         allocation = allocation_;
         emit Allocate(oldAlloc, allocation_);

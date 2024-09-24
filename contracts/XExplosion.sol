@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import './common/ICommonError.sol';
-import './interface/IERC20Burnable.sol';
-import './interface/IERC20Mintable.sol';
-import './RelayERC20.sol';
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+import {ICommonError} from './common/ICommonError.sol';
+import {IERC20Burnable} from './interface/IERC20Burnable.sol';
+import {IERC20Mintable} from './interface/IERC20Mintable.sol';
+import {RelayERC20} from './RelayERC20.sol';
 
 /**
  * @title XExplosion
