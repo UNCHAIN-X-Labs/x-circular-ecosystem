@@ -2,8 +2,9 @@
 pragma solidity ^0.8.24;
 
 import './ICommonAuth.sol';
+import './ICommonError.sol';
 
-contract CommonAuth is ICommonAuth {
+contract CommonAuth is ICommonAuth, ICommonError {
     address public override owner;
     address public override executor;
 
@@ -30,22 +31,30 @@ contract CommonAuth is ICommonAuth {
     }
 
     function _setOwner(address owner_) internal {
-        require(owner != owner_);
+        if (owner == owner_) {
+            revert InvalidAddress(owner_);
+        }
         emit OwnerChanged(owner, owner_);
         owner = owner_;
     }
 
     function _setExecutor(address executor_) internal {
-        require(executor != executor_);
+        if (executor == executor_) {
+            revert InvalidAddress(executor_);
+        }
         emit ExecutorChanged(executor, executor_);
         executor = executor_;
     }
     
     function _checkOwner() internal view {
-        require(msg.sender == owner, "Only call by owner");
+        if (msg.sender != owner) {
+            revert Unauthorized(msg.sender);
+        }
     }
 
     function _checkOwnerOrExecutor() internal view {
-        require(msg.sender == owner || msg.sender == executor, "Caller is unauthorized");
+        if (msg.sender != owner && msg.sender != executor) {
+            revert Unauthorized(msg.sender);
+        }
     }
 }

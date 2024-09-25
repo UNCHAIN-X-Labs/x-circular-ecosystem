@@ -6,10 +6,10 @@ import {IERC20Mintable} from './interface/IERC20Mintable.sol';
 import {ICommonError} from './common/ICommonError.sol';
 
 /**
- * @title RelayERC20
- * @notice {RelayERC20} is minted at a fixed rate when UNX is burned within the Unchain X ecosystem.
+ * @title XParticle
+ * @notice {XParticle} is minted at a fixed rate when UNX is burned within the Unchain X ecosystem.
  */
-contract RelayERC20 is IERC20Mintable, ERC20Burnable, ICommonError {
+contract XParticle is IERC20Mintable, ERC20Burnable, ICommonError {
     /// @dev The minter should be a contract implementing the UNX burning process.
     address public immutable minter;
     

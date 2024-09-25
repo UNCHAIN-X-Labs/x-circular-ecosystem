@@ -47,7 +47,10 @@ contract TimeLockController is IBaseTimeLock, CommonAuth, ReentrancyGuard {
      */
     function enqueue(DataParams[] calldata params, uint256 delay) external nonReentrant onlyOwnerOrExecutor {
         if(delay < minDelay || delay > maxDelay) {
-            revert InvalidNumber(delay);
+            // If delay is zero, it is emergency. Unnecessary delay.
+            if (delay > 0) {
+                revert InvalidNumber(delay);
+            }
         }
 
         for (uint256 i = 0; i < params.length; ++i) {
